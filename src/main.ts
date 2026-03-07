@@ -68,9 +68,11 @@ function setSliderPos(clientX: number) {
 }
 
 viewSelect.addEventListener("change", () => {
-  canvasWrap.classList.toggle("side-by-side", viewSelect.value === "side-by-side");
-  // Re-apply inline clip-path when switching back to compare mode
-  if (viewSelect.value === "compare") {
+  const isSideBySide = viewSelect.value === "side-by-side";
+  canvasWrap.classList.toggle("side-by-side", isSideBySide);
+  if (isSideBySide) {
+    outputCanvas.style.clipPath = "";
+  } else {
     outputCanvas.style.clipPath = `inset(0 0 0 ${sliderPos * 100}%)`;
     compareHandle.style.left = `${sliderPos * 100}%`;
   }
