@@ -15,8 +15,21 @@ const colVal = document.getElementById("col-val")!;
 const ditherSelect = document.getElementById("dither") as HTMLSelectElement;
 const paletteSelect = document.getElementById("palette") as HTMLSelectElement;
 const downloadBtn = document.getElementById("download")!;
+const errorBox = document.getElementById("error")!;
+
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_DIMENSION  = 4096;
 
 let sourceImage: HTMLImageElement | null = null;
+
+function showError(msg: string) {
+  errorBox.textContent = msg;
+  errorBox.classList.remove("hidden");
+}
+
+function clearError() {
+  errorBox.classList.add("hidden");
+}
 
 // --- File handling ---
 
@@ -36,9 +49,25 @@ fileInput.addEventListener("change", () => {
 });
 
 function loadFile(file: File) {
+  clearError();
+
+  if (!file.type.startsWith("image/")) {
+    showError("Unsupported file type. Please upload an image (PNG, JPEG, GIF, WebP, etc.).");
+    return;
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    showError(`File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum is 10 MB.`);
+    return;
+  }
+
   const url = URL.createObjectURL(file);
   const img = new Image();
   img.onload = () => {
+    if (img.width > MAX_DIMENSION || img.height > MAX_DIMENSION) {
+      URL.revokeObjectURL(url);
+      showError(`Image too large (${img.width}×${img.height}px). Maximum dimension is ${MAX_DIMENSION}px.`);
+      return;
+    }
     sourceImage = img;
     controls.classList.remove("hidden");
     canvasWrap.classList.remove("hidden");

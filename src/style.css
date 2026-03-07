@@ -106,4 +106,14 @@ main {
   height: auto;
 }
 
+#error {
+  background: #3a1a1a;
+  border: 1px solid #c0392b;
+  color: #e74c3c;
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+}
+
 .hidden { display: none !important; }
