@@ -45,6 +45,7 @@ header h1 {
   padding: 1rem;
   overflow: hidden;
   position: relative;
+  user-select: none;
 }
 
 .sb-section {

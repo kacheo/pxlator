@@ -98,6 +98,7 @@ viewSelect.addEventListener("change", () => {
 
 compareContainer.addEventListener("mousedown", (e) => {
   if (canvasWrap.classList.contains("side-by-side")) return;
+  e.preventDefault();
   setSliderPos(e.clientX);
   const onMove = (e: MouseEvent) => setSliderPos(e.clientX);
   const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
