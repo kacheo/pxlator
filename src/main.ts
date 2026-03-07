@@ -1,6 +1,5 @@
 const dropZone = document.getElementById("drop-zone")!;
 const fileInput = document.getElementById("file-input") as HTMLInputElement;
-const controls = document.getElementById("controls")!;
 const canvasWrap = document.getElementById("canvas-wrap")!;
 const originalCanvas = document.getElementById("original") as HTMLCanvasElement;
 const outputCanvas = document.getElementById("output") as HTMLCanvasElement;
@@ -11,16 +10,21 @@ const colVal = document.getElementById("col-val")!;
 const ditherSelect = document.getElementById("dither") as HTMLSelectElement;
 const paletteSelect = document.getElementById("palette") as HTMLSelectElement;
 const downloadBtn = document.getElementById("download")!;
+const copyBtn = document.getElementById("copy-btn")!;
 const downloadSizeSelect = document.getElementById("download-size") as HTMLSelectElement;
 const errorBox = document.getElementById("error")!;
 const compareContainer = document.getElementById("compare-container")!;
 const compareHandle = document.getElementById("compare-handle")!;
 const viewSelect = document.getElementById("view-mode") as HTMLSelectElement;
+const spinner = document.getElementById("spinner")!;
+const dropHint = document.getElementById("drop-hint")!;
+const toast = document.getElementById("toast")!;
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 const MAX_DIMENSION  = 4096;
 
 let sourceImage: HTMLImageElement | null = null;
+let sourceFileName = 'image';
 let pixelCanvas: HTMLCanvasElement | null = null;
 let pendingId = 0;
 let pendingW = 0;
@@ -31,7 +35,7 @@ let debounceTimer = 0;
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
 
 worker.onmessage = (e) => {
-  const { id, buffer } = e.data;
+  const { id, buffer, palette } = e.data;
   if (id !== pendingId) return;
 
   const pixels = new Uint8ClampedArray(buffer);
@@ -42,6 +46,7 @@ worker.onmessage = (e) => {
   pixelCanvas = tmpCanvas;
 
   updateDownloadOptions(pendingW, pendingH);
+  renderSwatches(palette as number[][]);
 
   // Match original canvas pixel dimensions so overlay aligns perfectly
   outputCanvas.width = originalCanvas.width;
@@ -54,6 +59,19 @@ worker.onmessage = (e) => {
 };
 
 worker.onerror = () => setProcessing(false);
+
+// --- Palette swatches ---
+
+function renderSwatches(palette: number[][]) {
+  const container = document.getElementById('palette-swatches')!;
+  container.innerHTML = '';
+  for (const [r, g, b] of palette) {
+    const s = document.createElement('span');
+    s.style.background = `rgb(${r},${g},${b})`;
+    s.title = `#${[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('')}`;
+    container.appendChild(s);
+  }
+}
 
 // --- Comparison slider ---
 
@@ -80,6 +98,7 @@ viewSelect.addEventListener("change", () => {
 
 compareContainer.addEventListener("mousedown", (e) => {
   if (canvasWrap.classList.contains("side-by-side")) return;
+  e.preventDefault();
   setSliderPos(e.clientX);
   const onMove = (e: MouseEvent) => setSliderPos(e.clientX);
   const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
@@ -98,11 +117,13 @@ compareContainer.addEventListener("touchstart", (e) => {
 
 function setProcessing(active: boolean) {
   if (active) {
-    canvasWrap.classList.add("processing");
+    spinner.classList.remove("hidden");
     downloadBtn.setAttribute("disabled", "");
+    copyBtn.setAttribute("disabled", "");
   } else {
-    canvasWrap.classList.remove("processing");
+    spinner.classList.add("hidden");
     downloadBtn.removeAttribute("disabled");
+    copyBtn.removeAttribute("disabled");
   }
 }
 
@@ -123,6 +144,12 @@ function clearError() {
   errorBox.classList.add("hidden");
 }
 
+function showToast(msg: string) {
+  toast.textContent = msg;
+  toast.classList.add('visible');
+  setTimeout(() => toast.classList.remove('visible'), 2000);
+}
+
 // --- File handling ---
 
 dropZone.addEventListener("dragover", (e) => {
@@ -140,6 +167,15 @@ fileInput.addEventListener("change", () => {
   if (fileInput.files?.[0]) loadFile(fileInput.files[0]);
 });
 
+document.addEventListener('paste', (e) => {
+  const item = Array.from(e.clipboardData?.items ?? [])
+    .find(i => i.type.startsWith('image/'));
+  if (item) {
+    const file = item.getAsFile();
+    if (file) loadFile(file);
+  }
+});
+
 function loadFile(file: File) {
   clearError();
 
@@ -152,6 +188,8 @@ function loadFile(file: File) {
     return;
   }
 
+  sourceFileName = file.name.replace(/\.[^.]+$/, '');
+
   const url = URL.createObjectURL(file);
   const img = new Image();
   img.onload = () => {
@@ -161,7 +199,10 @@ function loadFile(file: File) {
       return;
     }
     sourceImage = img;
-    controls.classList.remove("hidden");
+    document.querySelectorAll<HTMLElement>('.sb-section.hidden').forEach(s => {
+      if (s.id !== 'sec-image') s.classList.remove('hidden');
+    });
+    dropHint.classList.add('hidden');
     canvasWrap.classList.remove("hidden");
     drawOriginal();
     pixelate();
@@ -182,8 +223,16 @@ colSlider.addEventListener("input", () => {
 ditherSelect.addEventListener("change", () => pixelate());
 paletteSelect.addEventListener("change", () => {
   const isAuto = paletteSelect.value === "auto";
-  colSlider.parentElement!.style.display = isAuto ? "" : "none";
+  (document.getElementById('colors-label') as HTMLElement).style.display = isAuto ? "" : "none";
   pixelate();
+});
+
+document.querySelectorAll<HTMLButtonElement>('#res-presets button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    resSlider.value = btn.dataset.res!;
+    resVal.textContent = resSlider.value;
+    pixelate();
+  });
 });
 
 downloadBtn.addEventListener("click", () => {
@@ -196,16 +245,27 @@ downloadBtn.addEventListener("click", () => {
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(pixelCanvas, 0, 0, exportCanvas.width, exportCanvas.height);
   const link = document.createElement("a");
-  link.download = `pixelated-${scale}x.png`;
+  link.download = `${sourceFileName}-pixel-${scale}x.png`;
   link.href = exportCanvas.toDataURL("image/png");
   link.click();
+  showToast('Downloaded!');
+});
+
+copyBtn.addEventListener('click', () => {
+  if (!pixelCanvas) return;
+  pixelCanvas.toBlob(async (blob) => {
+    if (!blob) return;
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    showToast('Copied to clipboard!');
+  });
 });
 
 // --- Rendering ---
 
 function drawOriginal() {
   if (!sourceImage) return;
-  const maxDim = 400;
+  const container = document.getElementById('canvas-area')!;
+  const maxDim = Math.min(container.clientWidth, container.clientHeight) || 600;
   const scale = Math.min(maxDim / sourceImage.width, maxDim / sourceImage.height, 1);
   originalCanvas.width = Math.round(sourceImage.width * scale);
   originalCanvas.height = Math.round(sourceImage.height * scale);
@@ -253,5 +313,5 @@ function startProcessing() {
   pendingTmpCanvas = tmpCanvas;
 
   setProcessing(true);
-  worker.postMessage({ id: pendingId, buffer: imageData.data.buffer, width: smallW, height: smallH, paletteMode, ditherMode, colorCount });
+  worker.postMessage({ id: pendingId, buffer: imageData.data.buffer, width: smallW, height: smallH, paletteMode, ditherMode, colorCount }, [imageData.data.buffer]);
 }

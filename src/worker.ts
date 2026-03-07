@@ -21,5 +21,5 @@ onmessage = ({ data }) => {
     default: applyPalette(pixels, palette); break;
   }
 
-  postMessage({ id, buffer: pixels.buffer });
+  (self as unknown as Worker).postMessage({ id, buffer: pixels.buffer, palette }, [pixels.buffer]);
 };
