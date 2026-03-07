@@ -1,0 +1,109 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+header {
+  text-align: center;
+  padding: 2rem 1rem 1rem;
+}
+
+header h1 {
+  font-size: 2rem;
+  letter-spacing: 0.1em;
+  color: #00d4ff;
+}
+
+header p {
+  color: #888;
+  margin-top: 0.25rem;
+}
+
+main {
+  width: 100%;
+  max-width: 960px;
+  padding: 1rem;
+}
+
+#drop-zone {
+  border: 2px dashed #444;
+  border-radius: 8px;
+  padding: 3rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  position: relative;
+}
+
+#drop-zone:hover, #drop-zone.dragover {
+  border-color: #00d4ff;
+}
+
+#drop-zone input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+#controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 0;
+}
+
+#controls label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+#controls input[type="range"] { width: 120px; }
+#controls select { background: #2a2a3e; color: #e0e0e0; border: 1px solid #444; padding: 0.25rem; border-radius: 4px; }
+
+#controls button {
+  background: #00d4ff;
+  color: #1a1a2e;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+#canvas-wrap {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 1rem 0;
+}
+
+#canvas-wrap h3 {
+  text-align: center;
+  margin-bottom: 0.5rem;
+  color: #888;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#canvas-wrap canvas {
+  image-rendering: pixelated;
+  border: 1px solid #333;
+  max-width: 400px;
+  width: 100%;
+  height: auto;
+}
+
+.hidden { display: none !important; }
