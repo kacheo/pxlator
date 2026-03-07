@@ -1,6 +1,6 @@
 import { medianCut, applyPalette } from "./quantize";
 import { floydSteinberg, atkinson, ordered4x4 } from "./dither";
-import { GAMEBOY, NES, PICO8 } from "./palettes";
+import { GAMEBOY, NES, PICO8, C64, CGA, MSX } from "./palettes";
 
 onmessage = ({ data }) => {
   const { id, buffer, width, height, paletteMode, ditherMode, colorCount } = data;
@@ -11,6 +11,9 @@ onmessage = ({ data }) => {
     case "gameboy": palette = GAMEBOY; break;
     case "nes": palette = NES; break;
     case "pico8": palette = PICO8; break;
+    case "c64": palette = C64; break;
+    case "cga": palette = CGA; break;
+    case "msx": palette = MSX; break;
     default: palette = medianCut(pixels, colorCount); break;
   }
 
