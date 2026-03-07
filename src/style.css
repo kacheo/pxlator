@@ -123,3 +123,7 @@ main {
 }
 
 .hidden { display: none !important; }
+
+#canvas-wrap.processing #output {
+  opacity: 0.4;
+}

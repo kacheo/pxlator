@@ -1,7 +1,3 @@
-import { medianCut, applyPalette, type Palette } from "./quantize";
-import { floydSteinberg, atkinson, ordered4x4 } from "./dither";
-import { GAMEBOY, NES, PICO8 } from "./palettes";
-
 const dropZone = document.getElementById("drop-zone")!;
 const fileInput = document.getElementById("file-input") as HTMLInputElement;
 const controls = document.getElementById("controls")!;
@@ -23,6 +19,56 @@ const MAX_DIMENSION  = 4096;
 
 let sourceImage: HTMLImageElement | null = null;
 let pixelCanvas: HTMLCanvasElement | null = null;
+let pendingId = 0;
+let pendingW = 0;
+let pendingH = 0;
+let pendingTmpCanvas: HTMLCanvasElement | null = null;
+let debounceTimer = 0;
+
+const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
+
+worker.onmessage = (e) => {
+  const { id, buffer } = e.data;
+  if (id !== pendingId) return;
+
+  const pixels = new Uint8ClampedArray(buffer);
+  const imageData = new ImageData(pixels, pendingW, pendingH);
+  const tmpCanvas = pendingTmpCanvas!;
+  const ctx = tmpCanvas.getContext("2d")!;
+  ctx.putImageData(imageData, 0, 0);
+  pixelCanvas = tmpCanvas;
+
+  updateDownloadOptions(pendingW, pendingH);
+
+  const displayScale = Math.min(400 / pendingW, 400 / pendingH, 16);
+  outputCanvas.width = Math.round(pendingW * displayScale);
+  outputCanvas.height = Math.round(pendingH * displayScale);
+  const outCtx = outputCanvas.getContext("2d")!;
+  outCtx.imageSmoothingEnabled = false;
+  outCtx.drawImage(tmpCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
+
+  setProcessing(false);
+};
+
+worker.onerror = () => setProcessing(false);
+
+function setProcessing(active: boolean) {
+  if (active) {
+    canvasWrap.classList.add("processing");
+    downloadBtn.setAttribute("disabled", "");
+  } else {
+    canvasWrap.classList.remove("processing");
+    downloadBtn.removeAttribute("disabled");
+  }
+}
+
+function updateDownloadOptions(w: number, h: number) {
+  for (const opt of Array.from(downloadSizeSelect.options)) {
+    const s = parseInt(opt.value);
+    const label = s === 1 ? "Small" : s === 4 ? "Medium" : "Large";
+    opt.textContent = `${label} (${w * s}×${h * s}px)`;
+  }
+}
 
 function showError(msg: string) {
   errorBox.textContent = msg;
@@ -91,7 +137,6 @@ colSlider.addEventListener("input", () => {
 });
 ditherSelect.addEventListener("change", () => pixelate());
 paletteSelect.addEventListener("change", () => {
-  // Hide color count when using a preset palette
   const isAuto = paletteSelect.value === "auto";
   colSlider.parentElement!.style.display = isAuto ? "" : "none";
   pixelate();
@@ -126,13 +171,18 @@ function drawOriginal() {
 
 function pixelate() {
   if (!sourceImage) return;
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(startProcessing, 30);
+}
+
+function startProcessing() {
+  if (!sourceImage) return;
 
   const res = parseInt(resSlider.value);
   const colorCount = parseInt(colSlider.value);
   const ditherMode = ditherSelect.value;
   const paletteMode = paletteSelect.value;
 
-  // Downscale to target resolution
   const aspect = sourceImage.width / sourceImage.height;
   let smallW: number, smallH: number;
   if (aspect >= 1) {
@@ -143,7 +193,6 @@ function pixelate() {
     smallW = Math.max(1, Math.round(res * aspect));
   }
 
-  // Draw downscaled (bilinear for initial downsample)
   const tmpCanvas = document.createElement("canvas");
   tmpCanvas.width = smallW;
   tmpCanvas.height = smallH;
@@ -154,47 +203,11 @@ function pixelate() {
 
   const imageData = tmpCtx.getImageData(0, 0, smallW, smallH);
 
-  // Get palette
-  let palette: Palette;
-  switch (paletteMode) {
-    case "gameboy": palette = GAMEBOY; break;
-    case "nes": palette = NES; break;
-    case "pico8": palette = PICO8; break;
-    default: palette = medianCut(imageData.data, colorCount); break;
-  }
+  pendingId++;
+  pendingW = smallW;
+  pendingH = smallH;
+  pendingTmpCanvas = tmpCanvas;
 
-  // Apply dithering or direct palette mapping
-  switch (ditherMode) {
-    case "floyd-steinberg":
-      floydSteinberg(imageData.data, smallW, smallH, palette);
-      break;
-    case "atkinson":
-      atkinson(imageData.data, smallW, smallH, palette);
-      break;
-    case "ordered":
-      ordered4x4(imageData.data, smallW, smallH, palette);
-      break;
-    default:
-      applyPalette(imageData.data, palette);
-      break;
-  }
-
-  tmpCtx.putImageData(imageData, 0, 0);
-  pixelCanvas = tmpCanvas;
-
-  // Update download size option labels with actual dimensions
-  for (const opt of Array.from(downloadSizeSelect.options)) {
-    const s = parseInt(opt.value);
-    const w = smallW * s, h = smallH * s;
-    const label = s === 1 ? "Small" : s === 4 ? "Medium" : "Large";
-    opt.textContent = `${label} (${w}×${h}px)`;
-  }
-
-  // Upscale with nearest-neighbor for crisp pixels
-  const displayScale = Math.min(400 / smallW, 400 / smallH, 16);
-  outputCanvas.width = Math.round(smallW * displayScale);
-  outputCanvas.height = Math.round(smallH * displayScale);
-  const outCtx = outputCanvas.getContext("2d")!;
-  outCtx.imageSmoothingEnabled = false;
-  outCtx.drawImage(tmpCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
+  setProcessing(true);
+  worker.postMessage({ id: pendingId, buffer: imageData.data.buffer, width: smallW, height: smallH, paletteMode, ditherMode, colorCount });
 }
