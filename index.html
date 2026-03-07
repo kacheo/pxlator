@@ -39,6 +39,12 @@
           <option value="pico8">PICO-8</option>
         </select>
       </label>
+      <label>View
+        <select id="view-mode">
+          <option value="compare">Compare</option>
+          <option value="side-by-side">Side by Side</option>
+        </select>
+      </label>
       <div class="download-group">
         <select id="download-size">
           <option value="1">Small (true size)</option>
@@ -51,8 +57,14 @@
 
     <div id="canvas-wrap" class="hidden">
       <div id="compare-container">
-        <canvas id="original"></canvas>
-        <canvas id="output"></canvas>
+        <div class="compare-pane" id="pane-original">
+          <h3>Original</h3>
+          <canvas id="original"></canvas>
+        </div>
+        <div class="compare-pane" id="pane-output">
+          <h3>Pixelated</h3>
+          <canvas id="output"></canvas>
+        </div>
         <div id="compare-handle"><div id="compare-knob"></div></div>
         <span class="compare-label compare-label-left">Original</span>
         <span class="compare-label compare-label-right">Pixelated</span>

@@ -15,6 +15,7 @@ const downloadSizeSelect = document.getElementById("download-size") as HTMLSelec
 const errorBox = document.getElementById("error")!;
 const compareContainer = document.getElementById("compare-container")!;
 const compareHandle = document.getElementById("compare-handle")!;
+const viewSelect = document.getElementById("view-mode") as HTMLSelectElement;
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 const MAX_DIMENSION  = 4096;
@@ -66,7 +67,17 @@ function setSliderPos(clientX: number) {
   compareHandle.style.left = `${pct}%`;
 }
 
+viewSelect.addEventListener("change", () => {
+  canvasWrap.classList.toggle("side-by-side", viewSelect.value === "side-by-side");
+  // Re-apply inline clip-path when switching back to compare mode
+  if (viewSelect.value === "compare") {
+    outputCanvas.style.clipPath = `inset(0 0 0 ${sliderPos * 100}%)`;
+    compareHandle.style.left = `${sliderPos * 100}%`;
+  }
+});
+
 compareContainer.addEventListener("mousedown", (e) => {
+  if (canvasWrap.classList.contains("side-by-side")) return;
   setSliderPos(e.clientX);
   const onMove = (e: MouseEvent) => setSliderPos(e.clientX);
   const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
@@ -75,6 +86,7 @@ compareContainer.addEventListener("mousedown", (e) => {
 });
 
 compareContainer.addEventListener("touchstart", (e) => {
+  if (canvasWrap.classList.contains("side-by-side")) return;
   setSliderPos(e.touches[0].clientX);
   const onMove = (e: TouchEvent) => setSliderPos(e.touches[0].clientX);
   const onEnd = () => { window.removeEventListener("touchmove", onMove); window.removeEventListener("touchend", onEnd); };
