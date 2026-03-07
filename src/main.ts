@@ -13,6 +13,8 @@ const paletteSelect = document.getElementById("palette") as HTMLSelectElement;
 const downloadBtn = document.getElementById("download")!;
 const downloadSizeSelect = document.getElementById("download-size") as HTMLSelectElement;
 const errorBox = document.getElementById("error")!;
+const compareContainer = document.getElementById("compare-container")!;
+const compareHandle = document.getElementById("compare-handle")!;
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 const MAX_DIMENSION  = 4096;
@@ -40,9 +42,9 @@ worker.onmessage = (e) => {
 
   updateDownloadOptions(pendingW, pendingH);
 
-  const displayScale = Math.min(400 / pendingW, 400 / pendingH, 16);
-  outputCanvas.width = Math.round(pendingW * displayScale);
-  outputCanvas.height = Math.round(pendingH * displayScale);
+  // Match original canvas pixel dimensions so overlay aligns perfectly
+  outputCanvas.width = originalCanvas.width;
+  outputCanvas.height = originalCanvas.height;
   const outCtx = outputCanvas.getContext("2d")!;
   outCtx.imageSmoothingEnabled = false;
   outCtx.drawImage(tmpCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
@@ -51,6 +53,34 @@ worker.onmessage = (e) => {
 };
 
 worker.onerror = () => setProcessing(false);
+
+// --- Comparison slider ---
+
+let sliderPos = 0.5;
+
+function setSliderPos(clientX: number) {
+  const rect = compareContainer.getBoundingClientRect();
+  sliderPos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  const pct = sliderPos * 100;
+  outputCanvas.style.clipPath = `inset(0 0 0 ${pct}%)`;
+  compareHandle.style.left = `${pct}%`;
+}
+
+compareContainer.addEventListener("mousedown", (e) => {
+  setSliderPos(e.clientX);
+  const onMove = (e: MouseEvent) => setSliderPos(e.clientX);
+  const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+});
+
+compareContainer.addEventListener("touchstart", (e) => {
+  setSliderPos(e.touches[0].clientX);
+  const onMove = (e: TouchEvent) => setSliderPos(e.touches[0].clientX);
+  const onEnd = () => { window.removeEventListener("touchmove", onMove); window.removeEventListener("touchend", onEnd); };
+  window.addEventListener("touchmove", onMove);
+  window.addEventListener("touchend", onEnd);
+}, { passive: true });
 
 function setProcessing(active: boolean) {
   if (active) {
