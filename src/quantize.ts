@@ -1,83 +1,80 @@
 /** Median-cut color quantization on RGBA pixel data. */
 
+// Pixels are packed as r | (g << 8) | (b << 16) in a Uint32Array.
+// This avoids allocating one Uint8Array object per pixel.
+
 interface ColorBox {
-  pixels: Uint8Array[];
+  pixels: Uint32Array;
   volume: number;
 }
 
-function getVolume(pixels: Uint8Array[]): number {
-  let rMin = 255, rMax = 0, gMin = 255, gMax = 0, bMin = 255, bMax = 0;
-  for (const p of pixels) {
-    if (p[3] === 0) continue;
-    if (p[0] < rMin) rMin = p[0];
-    if (p[0] > rMax) rMax = p[0];
-    if (p[1] < gMin) gMin = p[1];
-    if (p[1] > gMax) gMax = p[1];
-    if (p[2] < bMin) bMin = p[2];
-    if (p[2] > bMax) bMax = p[2];
+function channelRange(pixels: Uint32Array, shift: number): [number, number] {
+  let min = 255, max = 0;
+  for (let i = 0; i < pixels.length; i++) {
+    const v = (pixels[i] >> shift) & 0xff;
+    if (v < min) min = v;
+    if (v > max) max = v;
   }
+  return [min, max];
+}
+
+function getVolume(pixels: Uint32Array): number {
+  const [rMin, rMax] = channelRange(pixels, 0);
+  const [gMin, gMax] = channelRange(pixels, 8);
+  const [bMin, bMax] = channelRange(pixels, 16);
   return (rMax - rMin) * (gMax - gMin) * (bMax - bMin);
 }
 
-function longestAxis(pixels: Uint8Array[]): number {
-  let rMin = 255, rMax = 0, gMin = 255, gMax = 0, bMin = 255, bMax = 0;
-  for (const p of pixels) {
-    if (p[3] === 0) continue;
-    if (p[0] < rMin) rMin = p[0];
-    if (p[0] > rMax) rMax = p[0];
-    if (p[1] < gMin) gMin = p[1];
-    if (p[1] > gMax) gMax = p[1];
-    if (p[2] < bMin) bMin = p[2];
-    if (p[2] > bMax) bMax = p[2];
-  }
-  const rRange = rMax - rMin;
-  const gRange = gMax - gMin;
-  const bRange = bMax - bMin;
+function longestAxis(pixels: Uint32Array): number {
+  const [rMin, rMax] = channelRange(pixels, 0);
+  const [gMin, gMax] = channelRange(pixels, 8);
+  const [bMin, bMax] = channelRange(pixels, 16);
+  const rRange = rMax - rMin, gRange = gMax - gMin, bRange = bMax - bMin;
   if (rRange >= gRange && rRange >= bRange) return 0;
-  if (gRange >= rRange && gRange >= bRange) return 1;
-  return 2;
+  if (gRange >= bRange) return 8;
+  return 16;
 }
 
 function splitBox(box: ColorBox): [ColorBox, ColorBox] {
-  const axis = longestAxis(box.pixels);
-  const sorted = box.pixels.slice().sort((a, b) => a[axis] - b[axis]);
+  const shift = longestAxis(box.pixels);
+  const sorted = box.pixels.slice().sort((a, b) => ((a >> shift) & 0xff) - ((b >> shift) & 0xff));
   const mid = Math.floor(sorted.length / 2);
-  const a = sorted.slice(0, mid);
-  const b = sorted.slice(mid);
+  const a = sorted.subarray(0, mid);
+  const b = sorted.subarray(mid);
   return [
     { pixels: a, volume: getVolume(a) },
     { pixels: b, volume: getVolume(b) },
   ];
 }
 
-function averageColor(pixels: Uint8Array[]): [number, number, number] {
-  let r = 0, g = 0, b = 0, count = 0;
-  for (const p of pixels) {
-    if (p[3] === 0) continue;
-    r += p[0];
-    g += p[1];
-    b += p[2];
-    count++;
+function averageColor(pixels: Uint32Array): [number, number, number] {
+  let r = 0, g = 0, b = 0;
+  for (let i = 0; i < pixels.length; i++) {
+    r += pixels[i] & 0xff;
+    g += (pixels[i] >> 8) & 0xff;
+    b += (pixels[i] >> 16) & 0xff;
   }
-  if (count === 0) return [0, 0, 0];
-  return [Math.round(r / count), Math.round(g / count), Math.round(b / count)];
+  const n = pixels.length;
+  return [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
 }
 
 export type Palette = [number, number, number][];
 
 export function medianCut(data: Uint8ClampedArray, targetColors: number): Palette {
-  const pixels: Uint8Array[] = [];
+  // Count opaque pixels and pack them into one Uint32Array
+  let count = 0;
+  for (let i = 0; i < data.length; i += 4) if (data[i + 3] > 0) count++;
+  if (count === 0) return [[0, 0, 0]];
+
+  const packed = new Uint32Array(count);
+  let j = 0;
   for (let i = 0; i < data.length; i += 4) {
-    pixels.push(new Uint8Array([data[i], data[i + 1], data[i + 2], data[i + 3]]));
+    if (data[i + 3] > 0) packed[j++] = data[i] | (data[i + 1] << 8) | (data[i + 2] << 16);
   }
 
-  const opaque = pixels.filter((p) => p[3] > 0);
-  if (opaque.length === 0) return [[0, 0, 0]];
-
-  let boxes: ColorBox[] = [{ pixels: opaque, volume: getVolume(opaque) }];
+  let boxes: ColorBox[] = [{ pixels: packed, volume: getVolume(packed) }];
 
   while (boxes.length < targetColors) {
-    // Split the box with the largest volume
     boxes.sort((a, b) => b.volume - a.volume);
     const largest = boxes.shift()!;
     if (largest.pixels.length < 2) {
@@ -100,20 +97,18 @@ export function nearestColor(
   for (const c of palette) {
     const dr = r - c[0], dg = g - c[1], db = b - c[2];
     const dist = dr * dr + dg * dg + db * db;
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = c;
-    }
+    if (dist < bestDist) { bestDist = dist; best = c; }
   }
   return best;
 }
 
 export function applyPalette(data: Uint8ClampedArray, palette: Palette): void {
+  const cache = new Map<number, [number, number, number]>();
   for (let i = 0; i < data.length; i += 4) {
     if (data[i + 3] === 0) continue;
-    const [r, g, b] = nearestColor(data[i], data[i + 1], data[i + 2], palette);
-    data[i] = r;
-    data[i + 1] = g;
-    data[i + 2] = b;
+    const key = data[i] | (data[i + 1] << 8) | (data[i + 2] << 16);
+    let c = cache.get(key);
+    if (c === undefined) { c = nearestColor(data[i], data[i + 1], data[i + 2], palette); cache.set(key, c); }
+    data[i] = c[0]; data[i + 1] = c[1]; data[i + 2] = c[2];
   }
 }

@@ -1,6 +1,7 @@
 import { nearestColor, type Palette } from "./quantize";
 
 export function floydSteinberg(data: Uint8ClampedArray, w: number, h: number, palette: Palette): void {
+  const cache = new Map<number, [number, number, number]>();
   const err = new Float32Array(data.length);
   for (let i = 0; i < data.length; i++) err[i] = data[i];
 
@@ -10,7 +11,7 @@ export function floydSteinberg(data: Uint8ClampedArray, w: number, h: number, pa
       if (data[i + 3] === 0) continue;
 
       const or = clamp(err[i]), og = clamp(err[i + 1]), ob = clamp(err[i + 2]);
-      const [nr, ng, nb] = nearestColor(or, og, ob, palette);
+      const [nr, ng, nb] = nearest(or, og, ob, palette, cache);
       data[i] = nr; data[i + 1] = ng; data[i + 2] = nb;
 
       const er = or - nr, eg = og - ng, eb = ob - nb;
@@ -23,6 +24,7 @@ export function floydSteinberg(data: Uint8ClampedArray, w: number, h: number, pa
 }
 
 export function atkinson(data: Uint8ClampedArray, w: number, h: number, palette: Palette): void {
+  const cache = new Map<number, [number, number, number]>();
   const err = new Float32Array(data.length);
   for (let i = 0; i < data.length; i++) err[i] = data[i];
 
@@ -32,7 +34,7 @@ export function atkinson(data: Uint8ClampedArray, w: number, h: number, palette:
       if (data[i + 3] === 0) continue;
 
       const or = clamp(err[i]), og = clamp(err[i + 1]), ob = clamp(err[i + 2]);
-      const [nr, ng, nb] = nearestColor(or, og, ob, palette);
+      const [nr, ng, nb] = nearest(or, og, ob, palette, cache);
       data[i] = nr; data[i + 1] = ng; data[i + 2] = nb;
 
       const er = (or - nr) / 8, eg = (og - ng) / 8, eb = (ob - nb) / 8;
@@ -54,6 +56,7 @@ const BAYER4 = [
 ];
 
 export function ordered4x4(data: Uint8ClampedArray, w: number, h: number, palette: Palette): void {
+  const cache = new Map<number, [number, number, number]>();
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
@@ -63,10 +66,21 @@ export function ordered4x4(data: Uint8ClampedArray, w: number, h: number, palett
       const r = clamp(data[i] + threshold);
       const g = clamp(data[i + 1] + threshold);
       const b = clamp(data[i + 2] + threshold);
-      const [nr, ng, nb] = nearestColor(r, g, b, palette);
+      const [nr, ng, nb] = nearest(r, g, b, palette, cache);
       data[i] = nr; data[i + 1] = ng; data[i + 2] = nb;
     }
   }
+}
+
+function nearest(
+  r: number, g: number, b: number,
+  palette: Palette,
+  cache: Map<number, [number, number, number]>
+): [number, number, number] {
+  const key = r | (g << 8) | (b << 16);
+  let c = cache.get(key);
+  if (c === undefined) { c = nearestColor(r, g, b, palette); cache.set(key, c); }
+  return c;
 }
 
 function spread(
