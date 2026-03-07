@@ -15,12 +15,14 @@ const colVal = document.getElementById("col-val")!;
 const ditherSelect = document.getElementById("dither") as HTMLSelectElement;
 const paletteSelect = document.getElementById("palette") as HTMLSelectElement;
 const downloadBtn = document.getElementById("download")!;
+const downloadSizeSelect = document.getElementById("download-size") as HTMLSelectElement;
 const errorBox = document.getElementById("error")!;
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 const MAX_DIMENSION  = 4096;
 
 let sourceImage: HTMLImageElement | null = null;
+let pixelCanvas: HTMLCanvasElement | null = null;
 
 function showError(msg: string) {
   errorBox.textContent = msg;
@@ -96,9 +98,17 @@ paletteSelect.addEventListener("change", () => {
 });
 
 downloadBtn.addEventListener("click", () => {
+  if (!pixelCanvas) return;
+  const scale = parseInt(downloadSizeSelect.value);
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = pixelCanvas.width * scale;
+  exportCanvas.height = pixelCanvas.height * scale;
+  const ctx = exportCanvas.getContext("2d")!;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(pixelCanvas, 0, 0, exportCanvas.width, exportCanvas.height);
   const link = document.createElement("a");
-  link.download = "pixelated.png";
-  link.href = outputCanvas.toDataURL("image/png");
+  link.download = `pixelated-${scale}x.png`;
+  link.href = exportCanvas.toDataURL("image/png");
   link.click();
 });
 
@@ -170,6 +180,15 @@ function pixelate() {
   }
 
   tmpCtx.putImageData(imageData, 0, 0);
+  pixelCanvas = tmpCanvas;
+
+  // Update download size option labels with actual dimensions
+  for (const opt of Array.from(downloadSizeSelect.options)) {
+    const s = parseInt(opt.value);
+    const w = smallW * s, h = smallH * s;
+    const label = s === 1 ? "Small" : s === 4 ? "Medium" : "Large";
+    opt.textContent = `${label} (${w}×${h}px)`;
+  }
 
   // Upscale with nearest-neighbor for crisp pixels
   const displayScale = Math.min(400 / smallW, 400 / smallH, 16);

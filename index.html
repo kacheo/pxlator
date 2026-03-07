@@ -39,7 +39,14 @@
           <option value="pico8">PICO-8</option>
         </select>
       </label>
-      <button id="download">Download PNG</button>
+      <div class="download-group">
+        <select id="download-size">
+          <option value="1">Small (true size)</option>
+          <option value="4">Medium (4×)</option>
+          <option value="16" selected>Large (16×)</option>
+        </select>
+        <button id="download">Download PNG</button>
+      </div>
     </div>
 
     <div id="canvas-wrap" class="hidden">
