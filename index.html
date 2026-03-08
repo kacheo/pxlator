@@ -26,12 +26,21 @@
         <h2>Palette</h2>
         <select id="palette">
           <option value="auto">Auto (from image)</option>
-          <option value="gameboy">Game Boy</option>
-          <option value="nes">NES</option>
-          <option value="pico8">PICO-8</option>
-          <option value="c64">C64</option>
-          <option value="cga">CGA</option>
-          <option value="msx">MSX</option>
+          <optgroup label="Retro">
+            <option value="gameboy">Game Boy</option>
+            <option value="nes">NES</option>
+            <option value="pico8">PICO-8</option>
+            <option value="c64">C64</option>
+            <option value="cga">CGA</option>
+            <option value="msx">MSX</option>
+          </optgroup>
+          <optgroup label="Vibes">
+            <option value="psychedelic">Psychedelic</option>
+            <option value="synthwave">Synthwave</option>
+            <option value="neoncity">Neon City</option>
+            <option value="candy">Candy</option>
+            <option value="lava">Lava</option>
+          </optgroup>
         </select>
         <label id="colors-label">Colors <input type="range" id="colors" min="2" max="256" value="16" /><span id="col-val">16</span></label>
         <div id="palette-swatches"></div>
