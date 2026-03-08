@@ -4,11 +4,37 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>pxlator — Image to Pixel Art</title>
+  <meta name="description" content="Convert images to pixel art in your browser. Downscale, quantize with classic palettes, and dither with Floyd-Steinberg, Atkinson, or ordered patterns. Free and open source." />
+  <meta property="og:title" content="pxlator — Image to Pixel Art" />
+  <meta property="og:description" content="Convert images to pixel art in your browser. Free, open source, no upload required." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://kacheo.github.io/pxlator/" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="pxlator — Image to Pixel Art" />
+  <meta name="twitter:description" content="Convert images to pixel art in your browser. Free, open source, no upload required." />
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
   <header>
-    <h1>pxlator</h1>
+    <div id="header-center">
+      <h1>pxlator</h1>
+      <p id="tagline">Image to pixel art — in your browser</p>
+    </div>
+    <div id="header-actions">
+      <span id="about-btn">&#x24D8;
+        <div id="about-popover">
+          <strong>pxlator</strong>
+          <ul>
+            <li>Drag &amp; drop any image</li>
+            <li>Downscale to pixel-art resolution</li>
+            <li>Quantize with classic palettes (Game Boy, NES, PICO-8&hellip;)</li>
+            <li>Dither: Floyd-Steinberg, Atkinson, ordered 4&times;4</li>
+            <li>Download as PNG at any scale</li>
+          </ul>
+        </div>
+      </span>
+      <a id="gh-link" href="https://github.com/kacheo/pxlator" target="_blank" rel="noopener">GitHub</a>
+    </div>
   </header>
 
   <div id="app-layout">
